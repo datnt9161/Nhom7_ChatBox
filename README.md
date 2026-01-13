@@ -1,4 +1,4 @@
-# Multiroom Chat - Java Application
+# Chat Box - Java Application
 
 Ứng dụng chat real-time hỗ trợ nhiều phòng chat (rooms) được implement hoàn toàn bằng **Java với Spring Boot**.
 
