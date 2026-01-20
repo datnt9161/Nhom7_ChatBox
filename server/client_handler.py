@@ -17,7 +17,6 @@ if database_path not in sys.path:
     sys.path.insert(0, database_path)
 
 from database import ChatDatabase
-from file_handler import FileHandler
 
 class ClientHandler:
     def __init__(self, client_socket, client_address, server):
@@ -31,9 +30,6 @@ class ClientHandler:
         
         # Database connection
         self.db = ChatDatabase(os.path.join(database_path, 'chatbox.db'))
-        
-        # File handler
-        self.file_handler = FileHandler(os.path.join('server', 'uploads'))
         
         print(f"👤 ClientHandler tạo cho {client_address}")
     
@@ -88,10 +84,6 @@ class ClientHandler:
                 self.handle_public_message(sender, content, timestamp)
             elif msg_type == "PRIVATE":
                 self.handle_private_message(sender, receiver, content, timestamp)
-            elif msg_type == "FILE_SEND":
-                self.handle_file_send(sender, receiver, content, timestamp)
-            elif msg_type == "FILE_REQUEST":
-                self.handle_file_request(sender, receiver, content, timestamp)
             elif msg_type == "STATS":
                 self.handle_stats_request(sender, timestamp)
             elif msg_type == "PING":
@@ -116,6 +108,10 @@ class ClientHandler:
                 # Gửi thông báo đăng nhập thành công
                 login_response = f"LOGIN_OK|SERVER|{username}|Welcome {user['display_name']}!|{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
                 self.send_message(login_response)
+                
+                # Delay một chút trước khi broadcast để client kịp setup listener
+                import time
+                time.sleep(0.1)
                 
                 # Thông báo user join và cập nhật user list
                 self.server.broadcast_user_joined(username)
@@ -213,99 +209,6 @@ class ClientHandler:
         except Exception as e:
             print(f"❌ Lỗi handle_private_message: {e}")
             self.send_error("Error sending private message")
-    
-    def handle_file_send(self, sender, receiver, content, timestamp):
-        """Xử lý gửi file"""
-        if not self.is_authenticated:
-            self.send_error("Not authenticated")
-            return
-        
-        try:
-            # Parse content: filename|filesize|file_data_base64
-            parts = content.split('|', 2)
-            if len(parts) != 3:
-                self.send_error("Invalid file format")
-                return
-            
-            filename = parts[0]
-            filesize = int(parts[1])
-            file_data_b64 = parts[2]
-            
-            # Decode file data
-            file_data = self.file_handler.decode_file_from_transfer(file_data_b64)
-            
-            # Validate file size
-            if len(file_data) != filesize:
-                self.send_error("File size mismatch")
-                return
-            
-            # Save file
-            success, result = self.file_handler.save_file(filename, file_data, sender)
-            
-            if success:
-                file_info = result
-                
-                # Gửi thông báo file đến receiver
-                if receiver == "ALL":
-                    # Public file share
-                    file_msg = f"FILE_SHARE|{sender}|ALL|{filename}|{file_info['saved_name']}|{filesize}|{timestamp}"
-                    self.server.broadcast_message(file_msg, self)
-                else:
-                    # Private file share
-                    file_msg = f"FILE_SHARE|{sender}|{receiver}|{filename}|{file_info['saved_name']}|{filesize}|{timestamp}"
-                    success = self.server.send_private_message(file_msg, receiver, self)
-                    
-                    if success:
-                        confirm_msg = f"FILE_SENT|SERVER|{sender}|File sent to {receiver}|{timestamp}"
-                        self.send_message(confirm_msg)
-                    else:
-                        self.send_error(f"User {receiver} not found or offline")
-                
-                print(f"📁 File {filename} từ {sender} đến {receiver}")
-                
-            else:
-                self.send_error(f"File upload failed: {result}")
-                
-        except Exception as e:
-            print(f"❌ Lỗi handle_file_send: {e}")
-            self.send_error("Error processing file")
-    
-    def handle_file_request(self, sender, receiver, content, timestamp):
-        """Xử lý yêu cầu download file"""
-        if not self.is_authenticated:
-            self.send_error("Not authenticated")
-            return
-        
-        try:
-            # content = saved_filename
-            saved_filename = content
-            file_path = os.path.join(self.file_handler.upload_dir, saved_filename)
-            
-            # Kiểm tra quyền truy cập file (chỉ cho phép download file của mình hoặc file public)
-            if not (saved_filename.startswith(f"{sender}_") or saved_filename.startswith("public_")):
-                self.send_error("Access denied")
-                return
-            
-            # Đọc file
-            success, file_data = self.file_handler.get_file(file_path)
-            
-            if success:
-                # Encode file data
-                file_data_b64 = self.file_handler.encode_file_for_transfer(file_data)
-                
-                # Gửi file data
-                original_name = saved_filename.split('_', 2)[-1]  # Lấy tên file gốc
-                file_response = f"FILE_DATA|SERVER|{sender}|{original_name}|{len(file_data)}|{file_data_b64}|{timestamp}"
-                self.send_message(file_response)
-                
-                print(f"📤 Gửi file {original_name} cho {sender}")
-                
-            else:
-                self.send_error(f"File not found: {file_data}")
-                
-        except Exception as e:
-            print(f"❌ Lỗi handle_file_request: {e}")
-            self.send_error("Error downloading file")
     
     def handle_stats_request(self, sender, timestamp):
         """Xử lý yêu cầu thống kê server"""
