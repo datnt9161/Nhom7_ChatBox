@@ -34,6 +34,9 @@ class ModernChatPage:
         # Animation variables
         self.animation_step = 0
         
+        # UI initialization flag
+        self._ui_initialized = False
+        
         self.create_modern_ui()
         
         # Start message listener
@@ -51,6 +54,9 @@ class ModernChatPage:
         
         # Create modern status bar
         self.create_modern_status_bar()
+        
+        # Mark UI as initialized
+        self._ui_initialized = True
         
         # Start animations
         self.animate_interface()
@@ -109,26 +115,14 @@ class ModernChatPage:
         right_frame = tk.Frame(header_content, bg=ModernColors.PRIMARY)
         right_frame.pack(side='right', fill='y', padx=30, pady=20)
         
-        # Control buttons
+        # Control buttons - CHỈ CÒN LOGOUT
         controls_frame = tk.Frame(right_frame, bg=ModernColors.PRIMARY)
         controls_frame.pack(side='right')
-        
-        # Settings button
-        settings_btn = self.create_header_button(
-            controls_frame, "⚙️", "Settings", self.show_settings
-        )
-        settings_btn.pack(side='left', padx=(0, 10))
-        
-        # Theme toggle
-        theme_btn = self.create_header_button(
-            controls_frame, "🌙", "Dark Mode", self.toggle_theme
-        )
-        theme_btn.pack(side='left', padx=(0, 10))
         
         # Logout button
         logout_btn = tk.Button(
             controls_frame,
-            text="🚪 Logout",
+            text="Logout",
             font=ModernFonts.BODY_MEDIUM,
             bg=ModernColors.ERROR,
             fg=ModernColors.WHITE,
@@ -139,7 +133,7 @@ class ModernChatPage:
             pady=10,
             command=self.handle_logout
         )
-        logout_btn.pack(side='left', padx=(10, 0))
+        logout_btn.pack(side='left')
         
         # Add hover effect
         ModernAnimations.button_hover_effect(
@@ -150,10 +144,11 @@ class ModernChatPage:
         def update_header_size(event=None):
             self.header_canvas.configure(scrollregion=self.header_canvas.bbox("all"))
             canvas_width = self.header_canvas.winfo_width()
-            self.header_canvas.itemconfig(
-                self.header_canvas.find_all()[0],
-                width=canvas_width
-            )
+            if self.header_canvas.find_all():
+                self.header_canvas.itemconfig(
+                    self.header_canvas.find_all()[0],
+                    width=canvas_width
+                )
         
         self.header_canvas.bind('<Configure>', update_header_size)
         self.root.after(100, update_header_size)
@@ -217,21 +212,77 @@ class ModernChatPage:
         tk.Label(
             sidebar_header,
             text="👥 Online Users",
-            font=ModernFonts.HEADLINE_SMALL,
-            fg=ModernColors.GRAY_800,
+            font=('Segoe UI', 18, 'bold'),
+            fg=ModernColors.GRAY_900,
             bg=ModernColors.GRAY_50
         ).pack(pady=20)
         
-        # Search box
+        # Search box - TẠO RIÊNG ĐỂ KIỂM SOÁT TỐT HƠN
         search_frame = tk.Frame(self.sidebar, bg=ModernColors.WHITE)
         search_frame.pack(fill='x', padx=20, pady=(0, 20))
         
-        self.search_frame, self.search_entry = ModernWidgets.create_modern_entry(
+        # Search label
+        search_label = tk.Label(
             search_frame,
-            placeholder="Search users...",
-            width=25
+            text="🔍 Search Users",
+            font=('Segoe UI', 12, 'bold'),
+            fg=ModernColors.GRAY_700,
+            bg=ModernColors.WHITE
         )
-        self.search_frame.pack(fill='x')
+        search_label.pack(anchor='w', pady=(0, 5))
+        
+        # Search entry container
+        search_container = tk.Frame(search_frame, bg=ModernColors.GRAY_50, relief='flat', bd=1)
+        search_container.pack(fill='x')
+        
+        # Search entry
+        self.search_entry = tk.Entry(
+            search_container,
+            font=('Segoe UI', 12, 'normal'),
+            bg=ModernColors.GRAY_50,
+            fg=ModernColors.GRAY_900,
+            relief='flat',
+            bd=0,
+            insertbackground=ModernColors.PRIMARY
+        )
+        self.search_entry.pack(fill='x', padx=10, pady=8)  # Padding để text không sát lề
+        
+        # Placeholder effect
+        placeholder_text = "Type username to search..."
+        self.search_entry.insert(0, placeholder_text)
+        self.search_entry.config(fg=ModernColors.GRAY_500)
+        
+        def on_search_focus_in(e):
+            if self.search_entry.get() == placeholder_text:
+                self.search_entry.delete(0, tk.END)
+                self.search_entry.config(fg=ModernColors.GRAY_900)
+        
+        def on_search_focus_out(e):
+            if not self.search_entry.get():
+                self.search_entry.insert(0, placeholder_text)
+                self.search_entry.config(fg=ModernColors.GRAY_500)
+        
+        def on_search_key_press(e):
+            if self.search_entry.get() == placeholder_text:
+                self.search_entry.delete(0, tk.END)
+                self.search_entry.config(fg=ModernColors.GRAY_900)
+            # Ngăn focus nhảy sang message entry
+            return "break"
+        
+        def on_search_key_release(e):
+            # Xử lý search và giữ focus trong search box
+            self.on_search_users(e)
+            # Đảm bảo focus vẫn ở search box
+            if e.widget == self.search_entry:
+                self.search_entry.focus_set()
+            return "break"
+        
+        self.search_entry.bind('<FocusIn>', on_search_focus_in)
+        self.search_entry.bind('<FocusOut>', on_search_focus_out)
+        self.search_entry.bind('<KeyPress>', on_search_key_press)
+        
+        # Bind search event với improved handling
+        self.search_entry.bind('<KeyRelease>', on_search_key_release)
         
         # Users list
         users_frame = tk.Frame(self.sidebar, bg=ModernColors.WHITE)
@@ -265,50 +316,96 @@ class ModernChatPage:
         self.users_canvas.pack(side="left", fill="both", expand=True)
         self.users_scrollbar.pack(side="right", fill="y")
         
-        # Chat type selector
-        type_frame = tk.Frame(self.sidebar, bg=ModernColors.GRAY_50, height=80)
+        # Chat type selector với custom design
+        self.create_chat_type_selector()
+    
+    def create_chat_type_selector(self):
+        """Create custom radio button selector for chat type"""
+        type_frame = tk.Frame(self.sidebar, bg=ModernColors.WHITE, height=100)
         type_frame.pack(fill='x')
         type_frame.pack_propagate(False)
         
         tk.Label(
             type_frame,
-            text="💬 Message Type",
-            font=ModernFonts.TITLE_SMALL,
-            fg=ModernColors.GRAY_800,
-            bg=ModernColors.GRAY_50
-        ).pack(pady=(15, 5))
+            text="Message Type",
+            font=('Segoe UI', 16, 'bold'),
+            fg=ModernColors.GRAY_900,
+            bg=ModernColors.WHITE
+        ).pack(pady=(20, 15))
         
-        radio_frame = tk.Frame(type_frame, bg=ModernColors.GRAY_50)
-        radio_frame.pack()
+        # Container cho custom radio buttons
+        radio_container = tk.Frame(type_frame, bg=ModernColors.WHITE)
+        radio_container.pack()
         
-        # Modern radio buttons
-        public_radio = tk.Radiobutton(
-            radio_frame,
-            text="🌐 Public",
-            variable=self.msg_type_var,
-            value="public",
-            font=ModernFonts.BODY_MEDIUM,
-            fg=ModernColors.GRAY_700,
-            bg=ModernColors.GRAY_50,
-            selectcolor=ModernColors.PRIMARY,
-            activebackground=ModernColors.GRAY_50,
-            command=self.on_chat_type_change
+        # Public option
+        public_frame = tk.Frame(radio_container, bg=ModernColors.WHITE)
+        public_frame.pack(side='left', padx=(0, 40))
+        
+        # Custom radio button cho Public
+        self.public_dot = tk.Label(
+            public_frame,
+            text="●",
+            font=('Segoe UI', 20),
+            fg=ModernColors.PRIMARY,  # Màu xanh khi được chọn
+            bg=ModernColors.WHITE,
+            cursor='hand2'
         )
-        public_radio.pack(side='left', padx=(0, 30))
+        self.public_dot.pack(side='left', padx=(0, 8))
         
-        private_radio = tk.Radiobutton(
-            radio_frame,
-            text="🔒 Private",
-            variable=self.msg_type_var,
-            value="private",
-            font=ModernFonts.BODY_MEDIUM,
-            fg=ModernColors.GRAY_700,
-            bg=ModernColors.GRAY_50,
-            selectcolor=ModernColors.SECONDARY,
-            activebackground=ModernColors.GRAY_50,
-            command=self.on_chat_type_change
+        public_label = tk.Label(
+            public_frame,
+            text="Public",
+            font=('Segoe UI', 14, 'bold'),
+            fg=ModernColors.GRAY_900,
+            bg=ModernColors.WHITE,
+            cursor='hand2'
         )
-        private_radio.pack(side='left')
+        public_label.pack(side='left')
+        
+        # Private option
+        private_frame = tk.Frame(radio_container, bg=ModernColors.WHITE)
+        private_frame.pack(side='left')
+        
+        # Custom radio button cho Private
+        self.private_dot = tk.Label(
+            private_frame,
+            text="●",
+            font=('Segoe UI', 20),
+            fg=ModernColors.GRAY_300,  # Màu xám khi không được chọn
+            bg=ModernColors.WHITE,
+            cursor='hand2'
+        )
+        self.private_dot.pack(side='left', padx=(0, 8))
+        
+        private_label = tk.Label(
+            private_frame,
+            text="Private",
+            font=('Segoe UI', 14, 'bold'),
+            fg=ModernColors.GRAY_900,
+            bg=ModernColors.WHITE,
+            cursor='hand2'
+        )
+        private_label.pack(side='left')
+        
+        # Store references for event binding
+        self.public_frame = public_frame
+        self.private_frame = private_frame
+        self.public_label = public_label
+        self.private_label = private_label
+        
+        # Bind events
+        self.public_dot.bind('<Button-1>', lambda e: self.select_public())
+        public_label.bind('<Button-1>', lambda e: self.select_public())
+        public_frame.bind('<Button-1>', lambda e: self.select_public())
+        
+        self.private_dot.bind('<Button-1>', lambda e: self.select_private())
+        private_label.bind('<Button-1>', lambda e: self.select_private())
+        private_frame.bind('<Button-1>', lambda e: self.select_private())
+        
+        # Set default selection
+        self.msg_type_var.set("public")
+        self.public_dot.config(fg=ModernColors.PRIMARY)
+        self.private_dot.config(fg=ModernColors.GRAY_300)
     
     def create_modern_chat_area(self, parent):
         """Create modern chat area with message bubbles"""
@@ -324,47 +421,37 @@ class ModernChatPage:
         self.chat_title_label = tk.Label(
             chat_header,
             text="💬 Public Chat",
-            font=ModernFonts.HEADLINE_SMALL,
-            fg=ModernColors.GRAY_800,
+            font=('Segoe UI', 18, 'bold'),
+            fg=ModernColors.GRAY_900,
             bg=ModernColors.GRAY_50
         )
         self.chat_title_label.pack(pady=20)
         
-        # Messages area with custom styling
-        messages_container = tk.Frame(chat_container, bg=ModernColors.GRAY_50)
-        messages_container.pack(fill='both', expand=True, padx=20, pady=(0, 20))
+        # Messages area - SỬ DỤNG SCROLLEDTEXT VỚI AUTO-RESIZE
+        messages_container = tk.Frame(chat_container, bg=ModernColors.WHITE)
+        messages_container.pack(fill='both', expand=True)
         
-        # Custom chat display
-        self.chat_frame = tk.Frame(messages_container, bg=ModernColors.WHITE)
-        self.chat_frame.pack(fill='both', expand=True)
-        
-        # Scrollable chat area
-        self.chat_canvas = tk.Canvas(
-            self.chat_frame,
+        # Sử dụng ScrolledText
+        from tkinter import scrolledtext
+        self.chat_display = scrolledtext.ScrolledText(
+            messages_container,
             bg=ModernColors.WHITE,
-            highlightthickness=0
+            fg=ModernColors.GRAY_900,
+            font=('Segoe UI', 12),
+            wrap=tk.WORD,
+            state=tk.DISABLED,
+            relief='flat',
+            bd=0,
+            padx=5,
+            pady=5
         )
-        self.chat_scrollbar = ttk.Scrollbar(
-            self.chat_frame,
-            orient="vertical",
-            command=self.chat_canvas.yview
-        )
-        self.chat_scrollable_frame = tk.Frame(self.chat_canvas, bg=ModernColors.WHITE)
+        self.chat_display.pack(fill='both', expand=True)
         
-        self.chat_scrollable_frame.bind(
-            "<Configure>",
-            lambda e: self.chat_canvas.configure(
-                scrollregion=self.chat_canvas.bbox("all")
-            )
-        )
+        # Lưu trữ tin nhắn để có thể re-render khi resize
+        self.messages = []
         
-        self.chat_canvas.create_window(
-            (0, 0), window=self.chat_scrollable_frame, anchor="nw"
-        )
-        self.chat_canvas.configure(yscrollcommand=self.chat_scrollbar.set)
-        
-        self.chat_canvas.pack(side="left", fill="both", expand=True)
-        self.chat_scrollbar.pack(side="right", fill="y")
+        # Bind resize event để tự động cập nhật vị trí tin nhắn
+        self.chat_display.bind('<Configure>', self.on_chat_resize)
         
         # Message input area
         self.create_modern_input_area(chat_container)
@@ -375,7 +462,7 @@ class ModernChatPage:
     def create_modern_input_area(self, parent):
         """Create modern message input area"""
         input_container = tk.Frame(parent, bg=ModernColors.WHITE)
-        input_container.pack(fill='x', padx=20, pady=(0, 20))
+        input_container.pack(fill='x', padx=0, pady=(0, 20))  # Loại bỏ padx=20
         
         # Input frame with glassmorphism
         input_frame = tk.Frame(
@@ -384,7 +471,7 @@ class ModernChatPage:
             relief='flat',
             bd=0
         )
-        input_frame.pack(fill='x', pady=10)
+        input_frame.pack(fill='x', pady=10, padx=20)  # Thêm padx=20 cho input frame
         
         # Message entry container
         entry_container = tk.Frame(input_frame, bg=ModernColors.GRAY_50)
@@ -393,9 +480,9 @@ class ModernChatPage:
         # Message entry
         self.message_entry = tk.Entry(
             entry_container,
-            font=ModernFonts.BODY_LARGE,
+            font=('Segoe UI', 14, 'normal'),
             bg=ModernColors.WHITE,
-            fg=ModernColors.GRAY_800,
+            fg=ModernColors.GRAY_900,
             relief='flat',
             bd=0,
             insertbackground=ModernColors.PRIMARY
@@ -405,8 +492,8 @@ class ModernChatPage:
         # Send button
         self.send_btn = tk.Button(
             entry_container,
-            text="📤 Send",
-            font=ModernFonts.BODY_MEDIUM,
+            text="Send",
+            font=('Segoe UI', 12, 'bold'),
             bg=ModernColors.PRIMARY,
             fg=ModernColors.WHITE,
             relief='flat',
@@ -454,7 +541,7 @@ class ModernChatPage:
         self.status_label = tk.Label(
             status_content,
             text="🟢 Connected",
-            font=ModernFonts.BODY_SMALL,
+            font=('Segoe UI', 11, 'bold'),
             fg=ModernColors.SUCCESS,
             bg=ModernColors.GRAY_800
         )
@@ -464,11 +551,39 @@ class ModernChatPage:
         self.users_count_label = tk.Label(
             status_content,
             text="👥 0 users online",
-            font=ModernFonts.BODY_SMALL,
-            fg=ModernColors.GRAY_300,
+            font=('Segoe UI', 11, 'normal'),
+            fg=ModernColors.GRAY_100,
             bg=ModernColors.GRAY_800
         )
         self.users_count_label.pack(side='right', pady=8)
+    
+    def select_public(self):
+        """Select public chat mode"""
+        self.msg_type_var.set("public")
+        self.public_dot.config(fg=ModernColors.PRIMARY)
+        self.private_dot.config(fg=ModernColors.GRAY_300)
+        if self._ui_initialized:
+            self.on_chat_type_change()
+    
+    def select_private(self):
+        """Select private chat mode"""
+        self.msg_type_var.set("private")
+        self.public_dot.config(fg=ModernColors.GRAY_300)
+        self.private_dot.config(fg=ModernColors.SECONDARY)
+        if self._ui_initialized:
+            self.on_chat_type_change()
+    
+    def on_chat_type_change(self):
+        """Handle chat type change"""
+        try:
+            if self.msg_type_var.get() == "public":
+                self.chat_title_label.config(text="💬 Public Chat")
+                self.selected_user = None
+            elif self.selected_user:
+                self.chat_title_label.config(text=f"🔒 Private Chat with {self.selected_user}")
+        except (AttributeError, tk.TclError):
+            # Widget doesn't exist yet or has been destroyed
+            pass
     
     def animate_interface(self):
         """Animate interface elements"""
@@ -479,128 +594,164 @@ class ModernChatPage:
             # Subtle color animation
             colors = [ModernColors.WHITE, ModernColors.GRAY_100, ModernColors.WHITE]
             color_index = (self.animation_step // 30) % len(colors)
-            self.logo_label.config(fg=colors[color_index])
+            try:
+                self.logo_label.config(fg=colors[color_index])
+            except tk.TclError:
+                pass
         
         # Continue animation
-        self.root.after(100, self.animate_interface)
+        if self._ui_initialized:
+            self.root.after(100, self.animate_interface)
     
-    def add_message_bubble(self, sender, content, msg_type, is_own=False):
-        """Add modern message bubble"""
-        # Message container
-        msg_container = tk.Frame(self.chat_scrollable_frame, bg=ModernColors.WHITE)
-        msg_container.pack(fill='x', padx=10, pady=5)
+    def on_chat_resize(self, event=None):
+        """Handle chat area resize - re-render messages to maintain right alignment"""
+        if hasattr(self, 'messages') and self.messages:
+            # Lưu vị trí scroll hiện tại
+            scroll_pos = self.chat_display.yview()[1]
+            
+            # Xóa tất cả nội dung
+            self.chat_display.config(state=tk.NORMAL)
+            self.chat_display.delete(1.0, tk.END)
+            self.chat_display.config(state=tk.DISABLED)
+            
+            # Re-render tất cả tin nhắn với vị trí mới
+            for msg in self.messages:
+                self._render_message(msg['sender'], msg['content'], msg['msg_type'], msg['is_own'], msg['timestamp'])
+            
+            # Khôi phục vị trí scroll
+            self.chat_display.after(10, lambda: self.chat_display.yview_moveto(scroll_pos))
+    
+    def _render_message(self, sender, content, msg_type, is_own, timestamp):
+        """Render a single message - tất cả căn trái với tên người gửi"""
+        self.chat_display.config(state=tk.NORMAL)
         
         if is_own:
-            # Own message - right aligned, blue bubble
-            bubble_frame = tk.Frame(msg_container, bg=ModernColors.WHITE)
-            bubble_frame.pack(anchor='e', padx=(50, 0))
+            # Own message - căn trái với tên và màu xanh
+            # Hiển thị tên người gửi
+            self.chat_display.insert(tk.END, f"You:\n")
             
-            # Message bubble
-            bubble = tk.Frame(
-                bubble_frame,
-                bg=ModernColors.PRIMARY,
-                relief='flat',
-                bd=0
-            )
-            bubble.pack(anchor='e')
+            start_index = self.chat_display.index(tk.END)
+            self.chat_display.insert(tk.END, f"{content}\n")
+            end_index = self.chat_display.index(tk.END + "-1c")
             
-            # Message text
-            msg_label = tk.Label(
-                bubble,
-                text=content,
-                font=ModernFonts.BODY_MEDIUM,
-                fg=ModernColors.WHITE,
-                bg=ModernColors.PRIMARY,
-                wraplength=300,
-                justify='left'
-            )
-            msg_label.pack(padx=15, pady=10)
+            # Tag với màu xanh cho tin nhắn của mình
+            tag_name = f"own_{start_index.replace('.', '_')}"
+            self.chat_display.tag_add(tag_name, start_index, end_index)
+            self.chat_display.tag_config(tag_name,
+                                       background=ModernColors.PRIMARY,  # Màu xanh
+                                       foreground=ModernColors.WHITE,
+                                       relief="raised",
+                                       borderwidth=1,
+                                       justify="left")
             
             # Timestamp
-            time_label = tk.Label(
-                bubble_frame,
-                text=datetime.now().strftime("%H:%M"),
-                font=ModernFonts.LABEL_SMALL,
-                fg=ModernColors.GRAY_400,
-                bg=ModernColors.WHITE
-            )
-            time_label.pack(anchor='e', pady=(2, 0))
-            
+            self.chat_display.insert(tk.END, f"{timestamp}\n\n")
+                
         else:
-            # Other's message - left aligned, gray bubble
-            bubble_frame = tk.Frame(msg_container, bg=ModernColors.WHITE)
-            bubble_frame.pack(anchor='w', padx=(0, 50))
+            # Other's message - căn trái với màu xám
+            if sender != 'SYSTEM':
+                self.chat_display.insert(tk.END, f"{sender}:\n")
             
-            # Sender name
-            sender_label = tk.Label(
-                bubble_frame,
-                text=sender,
-                font=ModernFonts.LABEL_MEDIUM,
-                fg=ModernColors.GRAY_600,
-                bg=ModernColors.WHITE
-            )
-            sender_label.pack(anchor='w', pady=(0, 2))
+            start_index = self.chat_display.index(tk.END)
+            self.chat_display.insert(tk.END, f"{content}\n")
+            end_index = self.chat_display.index(tk.END + "-1c")
             
-            # Message bubble
-            bubble = tk.Frame(
-                bubble_frame,
-                bg=ModernColors.GRAY_100,
-                relief='flat',
-                bd=0
-            )
-            bubble.pack(anchor='w')
+            # Tag cho tin nhắn người khác hoặc system
+            tag_name = f"other_{start_index.replace('.', '_')}"
+            self.chat_display.tag_add(tag_name, start_index, end_index)
             
-            # Message text
-            msg_label = tk.Label(
-                bubble,
-                text=content,
-                font=ModernFonts.BODY_MEDIUM,
-                fg=ModernColors.GRAY_800,
-                bg=ModernColors.GRAY_100,
-                wraplength=300,
-                justify='left'
-            )
-            msg_label.pack(padx=15, pady=10)
+            if sender == 'SYSTEM':
+                # System message - màu xanh info
+                self.chat_display.tag_config(tag_name,
+                                           background=ModernColors.INFO,
+                                           foreground=ModernColors.WHITE,
+                                           relief="raised",
+                                           borderwidth=1,
+                                           justify="left")
+            else:
+                # Other user message - màu xám
+                self.chat_display.tag_config(tag_name,
+                                           background=ModernColors.GRAY_100,
+                                           foreground=ModernColors.GRAY_800,
+                                           relief="raised",
+                                           borderwidth=1,
+                                           justify="left")
             
-            # Timestamp
-            time_label = tk.Label(
-                bubble_frame,
-                text=datetime.now().strftime("%H:%M"),
-                font=ModernFonts.LABEL_SMALL,
-                fg=ModernColors.GRAY_400,
-                bg=ModernColors.WHITE
-            )
-            time_label.pack(anchor='w', pady=(2, 0))
+            if sender != 'SYSTEM':
+                self.chat_display.insert(tk.END, f"{timestamp}\n\n")
+            else:
+                self.chat_display.insert(tk.END, f"\n")
         
-        # Auto-scroll to bottom
-        self.root.after(10, lambda: self.chat_canvas.yview_moveto(1.0))
+        self.chat_display.config(state=tk.DISABLED)
+    def add_message_bubble(self, sender, content, msg_type, is_own=False):
+        """Add modern message bubble and store for re-rendering"""
+        timestamp = datetime.now().strftime('%H:%M')
+        
+        # Lưu tin nhắn để có thể re-render khi resize
+        if not hasattr(self, 'messages'):
+            self.messages = []
+        
+        self.messages.append({
+            'sender': sender,
+            'content': content,
+            'msg_type': msg_type,
+            'is_own': is_own,
+            'timestamp': timestamp
+        })
+        
+        # Render tin nhắn
+        self._render_message(sender, content, msg_type, is_own, timestamp)
+        self.chat_display.see(tk.END)
     
     def add_system_message(self, message):
         """Add system message"""
-        msg_container = tk.Frame(self.chat_scrollable_frame, bg=ModernColors.WHITE)
-        msg_container.pack(fill='x', padx=10, pady=10)
+        timestamp = datetime.now().strftime('%H:%M')
         
-        # System message bubble
-        bubble = tk.Frame(
-            msg_container,
-            bg=ModernColors.INFO,
-            relief='flat',
-            bd=0
-        )
-        bubble.pack(anchor='center')
+        # Lưu system message
+        if not hasattr(self, 'messages'):
+            self.messages = []
         
-        msg_label = tk.Label(
-            bubble,
-            text=message,
-            font=ModernFonts.BODY_SMALL,
-            fg=ModernColors.WHITE,
-            bg=ModernColors.INFO,
-            wraplength=400
-        )
-        msg_label.pack(padx=20, pady=8)
+        self.messages.append({
+            'sender': 'SYSTEM',
+            'content': message,
+            'msg_type': 'system',
+            'is_own': False,
+            'timestamp': timestamp
+        })
         
-        # Auto-scroll to bottom
-        self.root.after(10, lambda: self.chat_canvas.yview_moveto(1.0))
+        # Render system message
+        self.chat_display.config(state=tk.NORMAL)
+        
+        # Center the system message
+        try:
+            widget_width = self.chat_display.winfo_width()
+            char_width = self.chat_display.tk.call("font", "measure", self.chat_display['font'], "0")
+            
+            if widget_width > 1 and char_width > 0:
+                max_chars = (widget_width - 50) // char_width
+                spaces_needed = max(0, (max_chars - len(message)) // 2)
+            else:
+                spaces_needed = max(0, (50 - len(message)) // 2)
+        except:
+            spaces_needed = max(0, (50 - len(message)) // 2)
+        
+        padding = " " * spaces_needed
+        
+        start_index = self.chat_display.index(tk.END)
+        self.chat_display.insert(tk.END, f"{padding}{message}\n\n")
+        end_index = self.chat_display.index(tk.END + "-2c")
+        
+        # Style system message
+        tag_name = f"system_{start_index}"
+        self.chat_display.tag_add(tag_name, f"{start_index} +{spaces_needed}c", end_index)
+        self.chat_display.tag_config(tag_name,
+                                   background=ModernColors.INFO,
+                                   foreground=ModernColors.WHITE,
+                                   relief="raised",
+                                   borderwidth=1)
+        
+        self.chat_display.config(state=tk.DISABLED)
+        self.chat_display.see(tk.END)
     
     def send_message(self):
         """Send message with modern UX"""
@@ -635,21 +786,38 @@ class ModernChatPage:
         except Exception as e:
             self.add_system_message(f"❌ Error sending message: {str(e)}")
     
-    def on_chat_type_change(self):
-        """Handle chat type change"""
-        if self.msg_type_var.get() == "public":
-            self.chat_title_label.config(text="💬 Public Chat")
-            self.selected_user = None
-        elif self.selected_user:
-            self.chat_title_label.config(text=f"🔒 Private Chat with {self.selected_user}")
-    
-    def show_settings(self):
-        """Show settings dialog"""
-        messagebox.showinfo("Settings", "Settings panel coming soon!")
-    
-    def toggle_theme(self):
-        """Toggle dark/light theme"""
-        messagebox.showinfo("Theme", "Theme toggle coming soon!")
+    def on_search_users(self, event=None):
+        """Handle user search"""
+        search_term = self.search_entry.get().strip()
+        
+        # Nếu search term là placeholder hoặc rỗng, hiển thị tất cả
+        if search_term == "Type username to search..." or not search_term:
+            filtered_users = self.online_users
+        else:
+            # Lọc user theo search term (không phân biệt hoa thường)
+            search_lower = search_term.lower()
+            filtered_users = [user for user in self.online_users if search_lower in user.lower()]
+        
+        # Xóa danh sách hiện tại
+        for widget in self.users_scrollable_frame.winfo_children():
+            widget.destroy()
+        
+        # Hiển thị user đã lọc
+        for user in filtered_users:
+            self.add_user_to_list(user)
+        
+        # Cập nhật số lượng user
+        if search_term and search_term != "Type username to search...":
+            # Khi đang search, hiển thị số kết quả
+            self.users_count_label.config(text=f"👥 {len(filtered_users)} found / {len(self.online_users) + 1} total")
+        else:
+            # Khi không search, hiển thị tổng số
+            total_count = len(self.online_users) + 1
+            self.users_count_label.config(text=f"👥 {total_count} users online")
+        
+        # Đảm bảo focus vẫn ở search box nếu đang search
+        if event and event.widget == self.search_entry and search_term != "Type username to search...":
+            self.root.after(1, lambda: self.search_entry.focus_set())
     
     def handle_logout(self):
         """Handle logout"""
@@ -703,6 +871,8 @@ class ModernChatPage:
     
     def _handle_received_message(self, msg_type, sender, receiver, content):
         """Handle received message"""
+        print(f"🔍 DEBUG: Nhận message - Type: {msg_type}, Sender: {sender}, Content: {content}")  # Debug
+        
         # Don't show own messages again
         if sender == self.username:
             return
@@ -713,14 +883,122 @@ class ModernChatPage:
             self.add_message_bubble(sender, content, "private", is_own=False)
         elif msg_type == "JOIN":
             self.add_system_message(f"👋 {sender} joined the chat")
+            # Không cần thêm user vào danh sách ở đây vì USERLIST sẽ được gửi sau
         elif msg_type == "LEAVE":
             self.add_system_message(f"👋 {sender} left the chat")
+            # Không cần xóa user ở đây vì USERLIST sẽ được gửi sau
+        elif msg_type == "USERLIST" or msg_type == "USER_LIST":
+            # Nhận danh sách user online từ server - TẤT CẢ CLIENT ĐỀU NHẬN
+            print(f"🎯 DEBUG: Nhận USERLIST - Raw content: '{content}'")  # Debug
+            
+            if content and content.strip():
+                users = [user.strip() for user in content.split(',') if user.strip()]
+                print(f"🎯 DEBUG: Users sau split: {users}")  # Debug
+                
+                # Lọc ra những user khác (không bao gồm mình)
+                other_users = [user for user in users if user != self.username]
+                
+                # Cập nhật danh sách
+                self.online_users = other_users
+                self.update_online_users()
+                
+                print(f"📋 USERLIST nhận được: {users}")  # Debug
+                print(f"📋 Sau khi lọc (không có {self.username}): {other_users}")  # Debug
+            else:
+                print("🎯 DEBUG: USERLIST content rỗng hoặc None")
+                self.online_users = []
+                self.update_online_users()
         elif msg_type == "ERROR":
             self.add_system_message(f"❌ Error: {content}")
         elif msg_type == "LOGIN_OK":
             self.add_system_message(f"✅ {content}")
+            # Thêm chính mình vào danh sách online
+            if self.username not in self.online_users:
+                self.online_users.append(self.username)
+                self.update_online_users()
     
-    def show(self):
+    def update_online_users(self):
+        """Update online users list"""
+        # Xóa tất cả user hiện tại
+        for widget in self.users_scrollable_frame.winfo_children():
+            widget.destroy()
+        
+        # Thêm từng user online (không bao gồm mình)
+        for user in self.online_users:
+            self.add_user_to_list(user)
+        
+        # Cập nhật số lượng user (bao gồm cả mình)
+        total_count = len(self.online_users) + 1  # +1 cho chính mình
+        self.users_count_label.config(text=f"👥 {total_count} users online")
+        
+        print(f"🔄 Cập nhật UI: {len(self.online_users)} users khác + mình = {total_count} total")  # Debug
+    
+    def add_user_to_list(self, username):
+        """Add a user to the online users list"""
+        user_frame = tk.Frame(self.users_scrollable_frame, bg=ModernColors.WHITE)
+        user_frame.pack(fill='x', padx=5, pady=2)
+        
+        # User avatar - NÚT TRÒN MÀU XANH
+        avatar_frame = tk.Frame(user_frame, bg=ModernColors.WHITE)
+        avatar_frame.pack(side='left', padx=(10, 10))
+        
+        avatar_button = tk.Label(
+            avatar_frame,
+            text="●",  # Nút tròn
+            font=('Segoe UI', 20),
+            bg=ModernColors.WHITE,
+            fg=ModernColors.PRIMARY,  # Màu xanh
+            width=2,
+            height=1
+        )
+        avatar_button.pack()
+        
+        # Username
+        name_label = tk.Label(
+            user_frame,
+            text=username,
+            font=('Segoe UI', 12, 'normal'),
+            bg=ModernColors.WHITE,
+            fg=ModernColors.GRAY_900,
+            anchor='w'
+        )
+        name_label.pack(side='left', fill='x', expand=True, padx=(0, 10))
+        
+        # Online status - NÚT XANH NHỎ
+        status_label = tk.Label(
+            user_frame,
+            text="●",
+            font=('Segoe UI', 12),
+            bg=ModernColors.WHITE,
+            fg=ModernColors.SUCCESS  # Màu xanh lá
+        )
+        status_label.pack(side='right', padx=(0, 10))
+        
+        # Click event để chọn user cho private chat
+        def select_user(event=None):
+            self.selected_user = username
+            self.on_chat_type_change()
+            # Highlight selected user
+            for child in self.users_scrollable_frame.winfo_children():
+                child.config(bg=ModernColors.WHITE)
+            user_frame.config(bg=ModernColors.GRAY_100)
+        
+        user_frame.bind('<Button-1>', select_user)
+        avatar_button.bind('<Button-1>', select_user)
+        name_label.bind('<Button-1>', select_user)
+        status_label.bind('<Button-1>', select_user)
+        
+        # Hover effect
+        def on_enter(e):
+            if user_frame.cget('bg') != ModernColors.GRAY_100:
+                user_frame.config(bg=ModernColors.GRAY_50)
+        
+        def on_leave(e):
+            if user_frame.cget('bg') != ModernColors.GRAY_100:
+                user_frame.config(bg=ModernColors.WHITE)
+        
+        user_frame.bind('<Enter>', on_enter)
+        user_frame.bind('<Leave>', on_leave)
         """Show chat page with entrance animation"""
         self.main_frame.pack(fill='both', expand=True)
         
@@ -733,3 +1011,34 @@ class ModernChatPage:
     def hide(self):
         """Hide chat page"""
         self.main_frame.pack_forget()
+    
+    def show(self):
+        """Show chat page with entrance animation"""
+        self.main_frame.pack(fill='both', expand=True)
+        
+        # Không tự động focus vào message entry nữa để tránh conflict với search
+        # self.root.after(100, lambda: self.message_entry.focus())
+        
+        # Request danh sách user online ngay khi vào chat - nhiều lần để đảm bảo
+        self.root.after(200, self.request_user_list)
+        self.root.after(500, self.request_user_list)
+        self.root.after(1000, self.request_user_list)
+        
+        # Entrance animation
+        ModernAnimations.fade_in(self.main_frame)
+    
+    def request_user_list(self):
+        """Request danh sách user online từ server"""
+        try:
+            # Gửi yêu cầu lấy danh sách user
+            request_msg = f"GET_USERS|{self.username}|SERVER|request|{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            self.socket.send(request_msg.encode('utf-8'))
+            print(f"📤 Đã gửi yêu cầu GET_USERS")
+        except Exception as e:
+            print(f"❌ Lỗi gửi GET_USERS: {e}")
+            # Fallback: thử broadcast để trigger server gửi lại user list
+            try:
+                ping_msg = f"PING|{self.username}|SERVER|ping|{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                self.socket.send(ping_msg.encode('utf-8'))
+            except:
+                pass

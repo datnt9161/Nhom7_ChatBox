@@ -52,9 +52,15 @@ class ModernChatBox:
     def setup_window(self):
         """Setup main window"""
         self.root.title("💬 ChatBox - Modern Chat Application")
-        self.root.geometry("1400x900")
-        self.root.minsize(1200, 800)
+        self.root.geometry("1000x700")
+        self.root.minsize(800, 600)  # Giảm kích thước tối thiểu
         self.root.configure(bg=ModernColors.GRAY_50)
+        
+        # Improve font rendering on Windows
+        try:
+            self.root.tk.call('tk', 'scaling', 1.0)
+        except:
+            pass
         
         # Center window
         self.center_window()

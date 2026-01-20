@@ -129,7 +129,9 @@ class ChatServer:
         """Gửi danh sách user online đến tất cả client"""
         users = self.get_online_users()
         user_list_msg = f"USERLIST|SERVER|ALL|{','.join(users)}|{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        print(f"📡 Broadcasting USERLIST: {users}")  # Debug
         self.broadcast_message(user_list_msg)
+        print(f"📡 USERLIST đã broadcast đến {len(self.clients)} clients")  # Debug
     
     def broadcast_user_joined(self, username):
         """Thông báo user mới join"""

@@ -37,12 +37,12 @@ class ModernColors:
     GRAY_100 = '#f3f4f6'
     GRAY_200 = '#e5e7eb'
     GRAY_300 = '#d1d5db'
-    GRAY_400 = '#9ca3af'
-    GRAY_500 = '#6b7280'
-    GRAY_600 = '#4b5563'
-    GRAY_700 = '#374151'
-    GRAY_800 = '#1f2937'
-    GRAY_900 = '#111827'
+    GRAY_400 = '#6b7280'  # Làm đậm hơn
+    GRAY_500 = '#4b5563'  # Làm đậm hơn
+    GRAY_600 = '#374151'  # Làm đậm hơn
+    GRAY_700 = '#1f2937'  # Làm đậm hơn
+    GRAY_800 = '#111827'  # Làm đậm hơn
+    GRAY_900 = '#000000'  # Đen hoàn toàn
     BLACK = '#000000'
     
     # Glass effect colors (using solid colors since Tkinter doesn't support alpha)
@@ -200,9 +200,9 @@ class ModernWidgets:
         }
         
         sizes = {
-            'small': {'font': ModernFonts.LABEL_MEDIUM, 'padx': 16, 'pady': 8},
-            'medium': {'font': ModernFonts.BODY_MEDIUM, 'padx': 24, 'pady': 12},
-            'large': {'font': ModernFonts.TITLE_SMALL, 'padx': 32, 'pady': 16}
+            'small': {'font': ('Segoe UI', 10, 'normal'), 'padx': 16, 'pady': 8},
+            'medium': {'font': ('Segoe UI', 11, 'normal'), 'padx': 24, 'pady': 12},
+            'large': {'font': ('Segoe UI', 12, 'bold'), 'padx': 32, 'pady': 16}
         }
         
         style_config = styles.get(style, styles['primary'])
@@ -240,9 +240,9 @@ class ModernWidgets:
         
         entry = tk.Entry(
             frame,
-            font=ModernFonts.BODY_MEDIUM,
+            font=('Segoe UI', 12, 'normal'),
             bg=ModernColors.GRAY_50,
-            fg=ModernColors.GRAY_800,
+            fg=ModernColors.GRAY_900,
             relief='flat',
             bd=0,
             width=width,
@@ -253,20 +253,27 @@ class ModernWidgets:
         # Add placeholder effect
         if placeholder:
             entry.insert(0, placeholder)
-            entry.config(fg=ModernColors.GRAY_400)
+            entry.config(fg=ModernColors.GRAY_500)
             
             def on_focus_in(e):
                 if entry.get() == placeholder:
                     entry.delete(0, tk.END)
-                    entry.config(fg=ModernColors.GRAY_800)
+                    entry.config(fg=ModernColors.GRAY_900)
             
             def on_focus_out(e):
                 if not entry.get():
                     entry.insert(0, placeholder)
-                    entry.config(fg=ModernColors.GRAY_400)
+                    entry.config(fg=ModernColors.GRAY_500)
+            
+            def on_key_press(e):
+                # Clear placeholder when user starts typing
+                if entry.get() == placeholder:
+                    entry.delete(0, tk.END)
+                    entry.config(fg=ModernColors.GRAY_900)
             
             entry.bind('<FocusIn>', on_focus_in)
             entry.bind('<FocusOut>', on_focus_out)
+            entry.bind('<KeyPress>', on_key_press)
         
         # Add focus border effect
         def on_focus_in_border(e):

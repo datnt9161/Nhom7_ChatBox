@@ -64,16 +64,16 @@ class ModernRegisterPage:
         if canvas_width > 1 and canvas_height > 1:
             self.bg_canvas.delete("bg_gradient")
             
-            # Create animated gradient (different colors for register)
+            # Create animated gradient (same as login page - blue/purple)
             for i in range(canvas_height):
                 # Calculate animated color
                 ratio = i / canvas_height
                 time_factor = math.sin(self.animation_step * 0.02) * 0.1
                 
-                # Base gradient from green to teal
-                r = int(16 + (6 - 16) * (ratio + time_factor))
-                g = int(185 + (182 - 185) * (ratio + time_factor))
-                b = int(129 + (212 - 129) * (ratio + time_factor))
+                # Base gradient from purple to blue (same as login)
+                r = int(102 + (116 - 102) * (ratio + time_factor))
+                g = int(126 + (75 - 126) * (ratio + time_factor))
+                b = int(234 + (162 - 234) * (ratio + time_factor))
                 
                 # Clamp values
                 r = max(0, min(255, r))
@@ -118,6 +118,14 @@ class ModernRegisterPage:
                     canvas_width // 2,
                     canvas_height // 2
                 )
+                
+                # Make card responsive to window size
+                if canvas_width < 600:
+                    # Small screen - reduce card width
+                    self.card_frame.config(width=canvas_width - 40)
+                else:
+                    # Normal screen
+                    self.card_frame.config(width=450)
         
         self.bg_canvas.bind('<Configure>', update_card_position)
         self.root.after(100, update_card_position)
@@ -129,7 +137,7 @@ class ModernRegisterPage:
         """Create the register card content"""
         # Card header with logo and title
         header_frame = tk.Frame(self.card_frame, bg=ModernColors.WHITE)
-        header_frame.pack(pady=(40, 20))
+        header_frame.pack(pady=(30, 15))  # Giảm padding
         
         # Animated logo
         logo_frame = tk.Frame(header_frame, bg=ModernColors.WHITE)
@@ -137,10 +145,10 @@ class ModernRegisterPage:
         
         self.logo_label = tk.Label(
             logo_frame,
-            text="✨",
-            font=('Segoe UI', 48),
+            text="💬",  # Đổi thành icon giống trang login
+            font=('Segoe UI', 36),  # Giảm kích thước logo
             bg=ModernColors.WHITE,
-            fg=ModernColors.SUCCESS
+            fg=ModernColors.PRIMARY  # Đổi thành màu primary (xanh dương)
         )
         self.logo_label.pack()
         
@@ -151,89 +159,130 @@ class ModernRegisterPage:
         title_label = tk.Label(
             header_frame,
             text="Join ChatBox",
-            font=ModernFonts.DISPLAY_MEDIUM,
+            font=('Segoe UI', 24, 'bold'),  # Giảm kích thước title
             bg=ModernColors.WHITE,
-            fg=ModernColors.GRAY_800
+            fg=ModernColors.GRAY_900
         )
-        title_label.pack(pady=(10, 0))
+        title_label.pack(pady=(8, 0))
         
         # Subtitle
         subtitle_label = tk.Label(
             header_frame,
             text="Create your account and start chatting",
-            font=ModernFonts.BODY_MEDIUM,
+            font=('Segoe UI', 11, 'normal'),  # Giảm kích thước subtitle
             bg=ModernColors.WHITE,
-            fg=ModernColors.GRAY_500
+            fg=ModernColors.GRAY_600
         )
-        subtitle_label.pack(pady=(5, 0))
+        subtitle_label.pack(pady=(3, 0))
         
         # Form section
         form_frame = tk.Frame(self.card_frame, bg=ModernColors.WHITE)
-        form_frame.pack(pady=20, padx=40)
+        form_frame.pack(pady=15, padx=30)  # Giảm padding
         
         # Welcome text
         welcome_label = tk.Label(
             form_frame,
             text="Let's get started!",
-            font=ModernFonts.HEADLINE_SMALL,
+            font=('Segoe UI', 16, 'bold'),  # Giảm kích thước
             bg=ModernColors.WHITE,
-            fg=ModernColors.GRAY_800
+            fg=ModernColors.GRAY_900
         )
-        welcome_label.pack(pady=(0, 20))
+        welcome_label.pack(pady=(0, 15))  # Giảm padding
         
         # Username field
         username_label = tk.Label(
             form_frame,
             text="Username",
-            font=ModernFonts.LABEL_MEDIUM,
+            font=('Segoe UI', 10, 'normal'),  # Giảm kích thước font
             bg=ModernColors.WHITE,
-            fg=ModernColors.GRAY_600
+            fg=ModernColors.GRAY_700
         )
-        username_label.pack(anchor='w', pady=(0, 5))
+        username_label.pack(anchor='w', pady=(0, 3))  # Giảm padding
         
-        self.username_frame, self.username_entry = ModernWidgets.create_modern_entry(
+        self.username_frame, self.username_entry = self.create_beautiful_entry(
             form_frame, 
             placeholder="Choose a unique username",
             width=25
         )
-        self.username_frame.pack(fill='x', pady=(0, 15))
+        self.username_frame.pack(fill='x', pady=(0, 12))  # Giảm padding
         
         # Password field
         password_label = tk.Label(
             form_frame,
             text="Password",
-            font=ModernFonts.LABEL_MEDIUM,
+            font=('Segoe UI', 10, 'normal'),  # Giảm kích thước font
             bg=ModernColors.WHITE,
-            fg=ModernColors.GRAY_600
+            fg=ModernColors.GRAY_700
         )
-        password_label.pack(anchor='w', pady=(0, 5))
+        password_label.pack(anchor='w', pady=(0, 3))  # Giảm padding
         
-        password_frame = tk.Frame(form_frame, bg=ModernColors.WHITE)
-        password_frame.pack(fill='x', pady=(0, 15))
+        # Beautiful password field
+        self.password_frame = tk.Frame(form_frame, bg=ModernColors.WHITE)
+        self.password_frame.pack(fill='x', pady=(0, 12))  # Giảm padding
+        
+        # Outer container with border and shadow effect
+        password_outer = tk.Frame(
+            self.password_frame,
+            bg=ModernColors.GRAY_200,
+            relief='flat',
+            bd=1
+        )
+        password_outer.pack(fill='x', padx=2, pady=2)
+        
+        # Inner container
+        password_inner = tk.Frame(
+            password_outer,
+            bg=ModernColors.WHITE,
+            relief='flat',
+            bd=0
+        )
+        password_inner.pack(fill='both', expand=True, padx=1, pady=1)
+        
+        # Password entry container
+        password_entry_frame = tk.Frame(password_inner, bg=ModernColors.WHITE)
+        password_entry_frame.pack(fill='x', padx=16, pady=8)  # Giảm padding
         
         self.password_entry = tk.Entry(
-            password_frame,
-            font=ModernFonts.BODY_MEDIUM,
-            bg=ModernColors.GRAY_50,
-            fg=ModernColors.GRAY_800,
+            password_entry_frame,
+            font=('Segoe UI', 12, 'normal'),
+            bg=ModernColors.WHITE,
+            fg=ModernColors.GRAY_900,
             relief='flat',
             bd=0,
-            width=25,
             show='*',
-            insertbackground=ModernColors.SUCCESS
+            insertbackground=ModernColors.PRIMARY  # Đổi thành primary color
         )
-        self.password_entry.pack(padx=16, pady=12, ipady=8)
+        self.password_entry.pack(side='left', fill='x', expand=True, ipady=6)  # Giảm ipady
+        
+        # Eye button to toggle password visibility
+        self.password_visible = False
+        self.eye_button = tk.Button(
+            password_entry_frame,
+            text="👁️",
+            font=('Segoe UI', 12),
+            bg=ModernColors.WHITE,
+            fg=ModernColors.GRAY_600,
+            relief='flat',
+            bd=0,
+            cursor='hand2',
+            command=self.toggle_password_visibility
+        )
+        self.eye_button.pack(side='right', padx=(5, 0))
         
         # Add focus effects to password field
         def on_password_focus_in(e):
-            password_frame.config(
-                highlightbackground=ModernColors.SUCCESS,
-                highlightcolor=ModernColors.SUCCESS,
-                highlightthickness=2
+            password_outer.config(
+                bg=ModernColors.PRIMARY,  # Đổi thành primary color
+                highlightbackground=ModernColors.PRIMARY,
+                highlightcolor=ModernColors.PRIMARY,
+                highlightthickness=1
             )
         
         def on_password_focus_out(e):
-            password_frame.config(highlightthickness=0)
+            password_outer.config(
+                bg=ModernColors.GRAY_200,
+                highlightthickness=0
+            )
         
         self.password_entry.bind('<FocusIn>', on_password_focus_in)
         self.password_entry.bind('<FocusOut>', on_password_focus_out)
@@ -242,49 +291,93 @@ class ModernRegisterPage:
         confirm_label = tk.Label(
             form_frame,
             text="Confirm Password",
-            font=ModernFonts.LABEL_MEDIUM,
+            font=('Segoe UI', 10, 'normal'),  # Giảm kích thước font
             bg=ModernColors.WHITE,
-            fg=ModernColors.GRAY_600
+            fg=ModernColors.GRAY_700
         )
-        confirm_label.pack(anchor='w', pady=(0, 5))
+        confirm_label.pack(anchor='w', pady=(0, 3))  # Giảm padding
         
-        confirm_frame = tk.Frame(form_frame, bg=ModernColors.WHITE)
-        confirm_frame.pack(fill='x', pady=(0, 20))
+        # Beautiful confirm password field
+        self.confirm_frame = tk.Frame(form_frame, bg=ModernColors.WHITE)
+        self.confirm_frame.pack(fill='x', pady=(0, 15))  # Giảm padding
+        
+        # Outer container with border and shadow effect
+        confirm_outer = tk.Frame(
+            self.confirm_frame,
+            bg=ModernColors.GRAY_200,
+            relief='flat',
+            bd=1
+        )
+        confirm_outer.pack(fill='x', padx=2, pady=2)
+        
+        # Inner container
+        confirm_inner = tk.Frame(
+            confirm_outer,
+            bg=ModernColors.WHITE,
+            relief='flat',
+            bd=0
+        )
+        confirm_inner.pack(fill='both', expand=True, padx=1, pady=1)
+        
+        # Confirm entry container
+        confirm_entry_frame = tk.Frame(confirm_inner, bg=ModernColors.WHITE)
+        confirm_entry_frame.pack(fill='x', padx=16, pady=8)  # Giảm padding
         
         self.confirm_entry = tk.Entry(
-            confirm_frame,
-            font=ModernFonts.BODY_MEDIUM,
-            bg=ModernColors.GRAY_50,
-            fg=ModernColors.GRAY_800,
+            confirm_entry_frame,
+            font=('Segoe UI', 12, 'normal'),
+            bg=ModernColors.WHITE,
+            fg=ModernColors.GRAY_900,
             relief='flat',
             bd=0,
-            width=25,
             show='*',
-            insertbackground=ModernColors.SUCCESS
+            insertbackground=ModernColors.PRIMARY  # Đổi thành primary color
         )
-        self.confirm_entry.pack(padx=16, pady=12, ipady=8)
+        self.confirm_entry.pack(side='left', fill='x', expand=True, ipady=6)  # Giảm ipady
+        
+        # Eye button for confirm password
+        self.confirm_visible = False
+        self.confirm_eye_button = tk.Button(
+            confirm_entry_frame,
+            text="👁️",
+            font=('Segoe UI', 12),
+            bg=ModernColors.WHITE,
+            fg=ModernColors.GRAY_600,
+            relief='flat',
+            bd=0,
+            cursor='hand2',
+            command=self.toggle_confirm_visibility
+        )
+        self.confirm_eye_button.pack(side='right', padx=(5, 0))
         
         # Add focus effects to confirm field
         def on_confirm_focus_in(e):
-            confirm_frame.config(
-                highlightbackground=ModernColors.SUCCESS,
-                highlightcolor=ModernColors.SUCCESS,
-                highlightthickness=2
+            confirm_outer.config(
+                bg=ModernColors.PRIMARY,  # Đổi thành primary color
+                highlightbackground=ModernColors.PRIMARY,
+                highlightcolor=ModernColors.PRIMARY,
+                highlightthickness=1
             )
         
         def on_confirm_focus_out(e):
-            confirm_frame.config(highlightthickness=0)
+            confirm_outer.config(
+                bg=ModernColors.GRAY_200,
+                highlightthickness=0
+            )
         
         self.confirm_entry.bind('<FocusIn>', on_confirm_focus_in)
         self.confirm_entry.bind('<FocusOut>', on_confirm_focus_out)
         
         # Register button
+        register_btn_container = tk.Frame(form_frame, bg=ModernColors.WHITE)
+        register_btn_container.pack(fill='x', pady=(0, 15))
+        
         self.register_btn = tk.Button(
-            form_frame,
+            register_btn_container,
             text="Create Account",
             command=self.handle_register,
-            font=ModernFonts.TITLE_SMALL,
-            bg=ModernColors.SUCCESS,
+            font=('Segoe UI', 12, 'bold'),
+            bg=ModernColors.PRIMARY,  # Đổi thành primary color
             fg=ModernColors.WHITE,
             relief='flat',
             bd=0,
@@ -292,7 +385,17 @@ class ModernRegisterPage:
             padx=32,
             pady=16
         )
-        self.register_btn.pack(fill='x', pady=(0, 15))
+        self.register_btn.pack(fill='x')
+        
+        # Add hover effect to register button
+        def on_register_enter(e):
+            self.register_btn.config(bg='#4f46e5')  # Đổi thành primary dark
+        
+        def on_register_leave(e):
+            self.register_btn.config(bg=ModernColors.PRIMARY)
+        
+        self.register_btn.bind('<Enter>', on_register_enter)
+        self.register_btn.bind('<Leave>', on_register_leave)
         
         # Add hover effect to register button
         ModernAnimations.button_hover_effect(
@@ -309,9 +412,9 @@ class ModernRegisterPage:
         self.loading_label = tk.Label(
             self.loading_frame,
             text="🔄 Creating account...",
-            font=ModernFonts.BODY_MEDIUM,
+            font=('Segoe UI', 12, 'normal'),
             bg=ModernColors.WHITE,
-            fg=ModernColors.SUCCESS
+            fg=ModernColors.PRIMARY  # Đổi thành primary color
         )
         self.loading_label.pack()
         
@@ -325,78 +428,178 @@ class ModernRegisterPage:
         divider_text = tk.Label(
             divider_frame,
             text="or",
-            font=ModernFonts.LABEL_SMALL,
+            font=('Segoe UI', 10, 'normal'),
             bg=ModernColors.WHITE,
-            fg=ModernColors.GRAY_400
+            fg=ModernColors.GRAY_500
         )
         divider_text.place(relx=0.5, rely=0.5, anchor='center')
         
         # Login button
+        login_btn_container = tk.Frame(form_frame, bg=ModernColors.WHITE)
+        login_btn_container.pack(fill='x', pady=(15, 0))
+        
         login_btn = tk.Button(
-            form_frame,
+            login_btn_container,
             text="Already have an account? Sign In",
             command=self.on_switch_to_login,
-            font=ModernFonts.TITLE_SMALL,
+            font=('Segoe UI', 12, 'normal'),
             bg=ModernColors.WHITE,
-            fg=ModernColors.SUCCESS,
+            fg=ModernColors.PRIMARY,  # Đổi thành primary color
             relief='flat',
-            bd=0,
+            bd=1,
             cursor='hand2',
             padx=32,
-            pady=16
+            pady=16,
+            highlightbackground=ModernColors.PRIMARY,  # Đổi thành primary color
+            highlightcolor=ModernColors.PRIMARY,
+            highlightthickness=1
         )
-        login_btn.pack(fill='x', pady=(15, 0))
+        login_btn.pack(fill='x')
         
         # Add hover effect to login button
-        ModernAnimations.button_hover_effect(
-            login_btn,
-            ModernColors.WHITE,
-            ModernColors.GRAY_50,
-            ModernColors.SUCCESS,
-            '#059669'
-        )
+        def on_login_enter(e):
+            login_btn.config(bg=ModernColors.GRAY_50)
+        
+        def on_login_leave(e):
+            login_btn.config(bg=ModernColors.WHITE)
+        
+        login_btn.bind('<Enter>', on_login_enter)
+        login_btn.bind('<Leave>', on_login_leave)
         
         # Status message
         self.status_label = tk.Label(
             form_frame,
             text="",
-            font=ModernFonts.BODY_SMALL,
+            font=('Segoe UI', 10, 'normal'),
             bg=ModernColors.WHITE,
             wraplength=300
         )
-        self.status_label.pack(pady=(15, 0))
-        
-        # Footer
-        footer_frame = tk.Frame(self.card_frame, bg=ModernColors.WHITE)
-        footer_frame.pack(pady=(0, 30))
-        
-        footer_label = tk.Label(
-            footer_frame,
-            text="© 2024 ChatBox. Made with ❤️",
-            font=ModernFonts.LABEL_SMALL,
-            bg=ModernColors.WHITE,
-            fg=ModernColors.GRAY_400
-        )
-        footer_label.pack()
+        self.status_label.pack(pady=(15, 30))
         
         # Bind events
         self.username_entry.bind('<Return>', lambda e: self.password_entry.focus())
         self.password_entry.bind('<Return>', lambda e: self.confirm_entry.focus())
         self.confirm_entry.bind('<Return>', lambda e: self.handle_register())
     
+    def toggle_password_visibility(self):
+        """Toggle password visibility"""
+        if self.password_visible:
+            # Hide password
+            self.password_entry.config(show='*')
+            self.eye_button.config(text="👁️", fg=ModernColors.GRAY_600)
+            self.password_visible = False
+        else:
+            # Show password
+            self.password_entry.config(show='')
+            self.eye_button.config(text="🙈", fg=ModernColors.PRIMARY)  # Đổi thành primary color
+            self.password_visible = True
+    
+    def toggle_confirm_visibility(self):
+        """Toggle confirm password visibility"""
+        if self.confirm_visible:
+            # Hide password
+            self.confirm_entry.config(show='*')
+            self.confirm_eye_button.config(text="👁️", fg=ModernColors.GRAY_600)
+            self.confirm_visible = False
+        else:
+            # Show password
+            self.confirm_entry.config(show='')
+            self.confirm_eye_button.config(text="🙈", fg=ModernColors.PRIMARY)  # Đổi thành primary color
+            self.confirm_visible = True
+    
+    def create_beautiful_entry(self, parent, placeholder="", width=30):
+        """Create beautiful entry field with modern design"""
+        # Main container
+        main_frame = tk.Frame(parent, bg=ModernColors.WHITE)
+        
+        # Outer container with border and shadow effect
+        outer_frame = tk.Frame(
+            main_frame,
+            bg=ModernColors.GRAY_200,
+            relief='flat',
+            bd=1
+        )
+        outer_frame.pack(fill='x', padx=2, pady=2)
+        
+        # Inner container
+        inner_frame = tk.Frame(
+            outer_frame,
+            bg=ModernColors.WHITE,
+            relief='flat',
+            bd=0
+        )
+        inner_frame.pack(fill='both', expand=True, padx=1, pady=1)
+        
+        # Entry field
+        entry = tk.Entry(
+            inner_frame,
+            font=('Segoe UI', 12, 'normal'),
+            bg=ModernColors.WHITE,
+            fg=ModernColors.GRAY_900,
+            relief='flat',
+            bd=0,
+            insertbackground=ModernColors.PRIMARY  # Đổi thành primary color
+        )
+        entry.pack(fill='x', padx=16, pady=8, ipady=6)  # Giảm padding và ipady để match với password field
+        
+        # Add placeholder effect
+        if placeholder:
+            entry.insert(0, placeholder)
+            entry.config(fg=ModernColors.GRAY_500)
+            
+            def on_focus_in(e):
+                if entry.get() == placeholder:
+                    entry.delete(0, tk.END)
+                    entry.config(fg=ModernColors.GRAY_900)
+            
+            def on_focus_out(e):
+                if not entry.get():
+                    entry.insert(0, placeholder)
+                    entry.config(fg=ModernColors.GRAY_500)
+            
+            def on_key_press(e):
+                # Clear placeholder when user starts typing
+                if entry.get() == placeholder:
+                    entry.delete(0, tk.END)
+                    entry.config(fg=ModernColors.GRAY_900)
+            
+            entry.bind('<FocusIn>', on_focus_in)
+            entry.bind('<FocusOut>', on_focus_out)
+            entry.bind('<KeyPress>', on_key_press)
+        
+        # Add focus border effect
+        def on_focus_in_border(e):
+            outer_frame.config(
+                bg=ModernColors.PRIMARY,  # Đổi thành primary color
+                highlightbackground=ModernColors.PRIMARY,
+                highlightcolor=ModernColors.PRIMARY,
+                highlightthickness=1
+            )
+        
+        def on_focus_out_border(e):
+            outer_frame.config(
+                bg=ModernColors.GRAY_200,
+                highlightthickness=0
+            )
+        
+        entry.bind('<FocusIn>', on_focus_in_border)
+        entry.bind('<FocusOut>', on_focus_out_border)
+        
+        return main_frame, entry
+    
     def animate_logo(self):
-        """Animate the logo with different sparkle emojis"""
+        """Animate the logo with different chat emojis (same as login)"""
         current_text = self.logo_label.cget('text')
         
-        # Rotate through different sparkle emojis
-        emojis = ['✨', '🌟', '⭐', '💫']
+        # Rotate through different chat emojis (same as login page)
+        emojis = ['💬', '💭', '🗨️', '💬']
         current_index = emojis.index(current_text) if current_text in emojis else 0
         next_index = (current_index + 1) % len(emojis)
         
         self.logo_label.config(text=emojis[next_index])
         
-        # Continue animation every 1.5 seconds
-        self.root.after(1500, self.animate_logo)
+        # Continue animation every 2 seconds (same as login)
+        self.root.after(2000, self.animate_logo)
     
     def create_particles_effect(self):
         """Create floating particles background effect"""

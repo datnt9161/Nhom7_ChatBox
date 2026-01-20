@@ -84,6 +84,8 @@ class ClientHandler:
                 self.handle_public_message(sender, content, timestamp)
             elif msg_type == "PRIVATE":
                 self.handle_private_message(sender, receiver, content, timestamp)
+            elif msg_type == "GET_USERS":
+                self.handle_get_users_request(sender, timestamp)
             elif msg_type == "STATS":
                 self.handle_stats_request(sender, timestamp)
             elif msg_type == "PING":
@@ -111,10 +113,17 @@ class ClientHandler:
                 
                 # Delay một chút trước khi broadcast để client kịp setup listener
                 import time
-                time.sleep(0.1)
+                time.sleep(0.2)  # Tăng delay lên 200ms
                 
                 # Thông báo user join và cập nhật user list
                 self.server.broadcast_user_joined(username)
+                
+                # Gửi thêm một lần USERLIST riêng cho client mới login
+                time.sleep(0.1)
+                users = self.server.get_online_users()
+                user_list_msg = f"USERLIST|SERVER|{username}|{','.join(users)}|{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                self.send_message(user_list_msg)
+                print(f"📤 Gửi USERLIST riêng cho {username}: {users}")  # Debug
                 
                 print(f"✅ User {username} đã đăng nhập từ {self.address}")
                 
@@ -209,6 +218,24 @@ class ClientHandler:
         except Exception as e:
             print(f"❌ Lỗi handle_private_message: {e}")
             self.send_error("Error sending private message")
+    
+    def handle_get_users_request(self, sender, timestamp):
+        """Xử lý yêu cầu lấy danh sách user online"""
+        if not self.is_authenticated:
+            self.send_error("Not authenticated")
+            return
+        
+        try:
+            # Lấy danh sách user online
+            users = self.server.get_online_users()
+            user_list_msg = f"USERLIST|SERVER|{sender}|{','.join(users)}|{timestamp}"
+            self.send_message(user_list_msg)
+            
+            print(f"📤 Gửi USERLIST cho {sender}: {users}")
+            
+        except Exception as e:
+            print(f"❌ Lỗi handle_get_users_request: {e}")
+            self.send_error("Error getting user list")
     
     def handle_stats_request(self, sender, timestamp):
         """Xử lý yêu cầu thống kê server"""
