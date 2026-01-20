@@ -38,13 +38,13 @@ class ClientHandler:
         try:
             while self.is_running:
                 try:
-                    # Nhận tin nhắn từ client
-                    message = self.client_socket.recv(1024).decode('utf-8')
+                    # Nhận tin nhắn từ client - tăng buffer size cho file upload
+                    message = self.client_socket.recv(1024 * 1024).decode('utf-8')  # 1MB buffer
                     
                     if not message:
                         break
                     
-                    print(f"📨 Nhận từ {self.address}: {message}")
+                    print(f"📨 Nhận từ {self.address}: {len(message)} bytes")
                     self.handle_message(message)
                     
                 except socket.timeout:
@@ -63,9 +63,13 @@ class ClientHandler:
     def handle_message(self, message):
         """Xử lý tin nhắn từ client theo protocol"""
         try:
+            print(f"🔍 DEBUG: Raw message length: {len(message)}")
+            print(f"🔍 DEBUG: Message start: {message[:100]}...")
+            
             # Parse message: TYPE|SENDER|RECEIVER|CONTENT|TIMESTAMP
             parts = message.split('|', 4)
             if len(parts) < 4:
+                print(f"❌ DEBUG: Invalid parts count: {len(parts)}")
                 self.send_error("Invalid message format")
                 return
             
@@ -74,6 +78,9 @@ class ClientHandler:
             receiver = parts[2]
             content = parts[3]
             timestamp = parts[4] if len(parts) > 4 else datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
+            print(f"🔍 DEBUG: Parsed - Type: {msg_type}, Sender: {sender}, Receiver: {receiver}")
+            print(f"🔍 DEBUG: Content length: {len(content)}")
             
             # Xử lý theo loại tin nhắn
             if msg_type == "LOGIN":
@@ -90,11 +97,20 @@ class ClientHandler:
                 self.handle_stats_request(sender, timestamp)
             elif msg_type == "PING":
                 self.send_message("PONG|SERVER|CLIENT|OK|" + timestamp)
+            elif msg_type == "FILE_UPLOAD":
+                self.handle_file_upload(sender, receiver, content, timestamp)
+            elif msg_type == "FILE_DOWNLOAD":
+                self.handle_file_download(sender, content, timestamp)
+            elif msg_type == "FILE_LIST":
+                self.handle_file_list_request(sender, timestamp)
+            elif msg_type == "FILE_SHARE":
+                self.handle_file_share(sender, receiver, content, timestamp)
             else:
                 self.send_error(f"Unknown message type: {msg_type}")
                 
         except Exception as e:
             print(f"❌ Lỗi handle_message: {e}")
+            print(f"❌ Message causing error: {message[:200]}...")
             self.send_error("Server error processing message")
     
     def handle_login(self, username, password):
@@ -256,6 +272,194 @@ class ClientHandler:
         except Exception as e:
             print(f"❌ Lỗi handle_stats_request: {e}")
             self.send_error("Error getting stats")
+    
+    def handle_file_upload(self, sender, receiver, content, timestamp):
+        """Xử lý upload file"""
+        if not self.is_authenticated:
+            self.send_error("Not authenticated")
+            return
+        
+        try:
+            # Parse file data: filename#filesize#base64_data (sử dụng # thay vì |)
+            parts = content.split('#', 2)
+            if len(parts) != 3:
+                print(f"❌ DEBUG: Invalid file format. Parts: {len(parts)}")
+                print(f"❌ DEBUG: Content preview: {content[:200]}...")
+                self.send_error("Invalid file format")
+                return
+            
+            filename, filesize, file_data = parts
+            
+            print(f"🔍 DEBUG: Parsed file - Name: {filename}, Size: {filesize}")
+            print(f"🔍 DEBUG: Base64 data length: {len(file_data)}")
+            
+            # Tạo thư mục files nếu chưa có
+            import os
+            files_dir = os.path.join(os.path.dirname(__file__), '..', 'files')
+            os.makedirs(files_dir, exist_ok=True)
+            
+            # Decode và lưu file
+            import base64
+            file_path = os.path.join(files_dir, f"{self.username}_{filename}")
+            
+            with open(file_path, 'wb') as f:
+                f.write(base64.b64decode(file_data))
+            
+            print(f"✅ DEBUG: File saved to: {file_path}")
+            
+            # Thông báo upload thành công
+            success_msg = f"FILE_UPLOAD_OK|SERVER|{sender}|{filename} uploaded successfully|{timestamp}"
+            self.send_message(success_msg)
+            
+            # Broadcast thông báo có file mới
+            if receiver == "ALL":
+                broadcast_msg = f"FILE_SHARED|{sender}|ALL|{sender} shared file: {filename}|{timestamp}"
+                self.server.broadcast_message(broadcast_msg, self)
+            else:
+                # Gửi private file notification
+                private_msg = f"FILE_SHARED|{sender}|{receiver}|{sender} sent you a file: {filename}|{timestamp}"
+                self.server.send_private_message(private_msg, receiver, self)
+            
+            print(f"📁 File uploaded: {filename} by {sender}")
+            
+        except Exception as e:
+            print(f"❌ Lỗi handle_file_upload: {e}")
+            import traceback
+            traceback.print_exc()
+            self.send_error("Error uploading file")
+    
+    def handle_file_download(self, sender, filename, timestamp):
+        """Xử lý download file"""
+        if not self.is_authenticated:
+            self.send_error("Not authenticated")
+            return
+        
+        try:
+            import os
+            import base64
+            
+            files_dir = os.path.join(os.path.dirname(__file__), '..', 'files')
+            file_path = os.path.join(files_dir, filename)
+            
+            if not os.path.exists(file_path):
+                self.send_error(f"File {filename} not found")
+                return
+            
+            # Đọc và encode file
+            with open(file_path, 'rb') as f:
+                file_data = base64.b64encode(f.read()).decode('utf-8')
+            
+            file_size = os.path.getsize(file_path)
+            
+            # Gửi file data về client - Format: TYPE|SENDER|RECEIVER|CONTENT|TIMESTAMP
+            # Content sẽ là: filename#filesize#base64_data (sử dụng # thay vì |)
+            file_content = f"{filename}#{file_size}#{file_data}"
+            download_msg = f"FILE_DOWNLOAD_OK|SERVER|{sender}|{file_content}|{timestamp}"
+            self.send_message(download_msg)
+            
+            print(f"📥 File downloaded: {filename} by {sender}")
+            
+        except Exception as e:
+            print(f"❌ Lỗi handle_file_download: {e}")
+            self.send_error("Error downloading file")
+    
+    def handle_file_list_request(self, sender, timestamp):
+        """Xử lý yêu cầu danh sách file"""
+        if not self.is_authenticated:
+            self.send_error("Not authenticated")
+            return
+        
+        try:
+            import os
+            
+            files_dir = os.path.join(os.path.dirname(__file__), '..', 'files')
+            
+            if not os.path.exists(files_dir):
+                file_list = ""
+            else:
+                files = []
+                for filename in os.listdir(files_dir):
+                    file_path = os.path.join(files_dir, filename)
+                    if os.path.isfile(file_path):
+                        file_size = os.path.getsize(file_path)
+                        # Format: filename:size:uploader
+                        if '_' in filename:
+                            uploader, original_name = filename.split('_', 1)
+                            files.append(f"{original_name}:{file_size}:{uploader}")
+                        else:
+                            files.append(f"{filename}:{file_size}:unknown")
+                
+                file_list = ",".join(files)
+            
+            # Gửi danh sách file
+            list_msg = f"FILE_LIST_OK|SERVER|{sender}|{file_list}|{timestamp}"
+            self.send_message(list_msg)
+            
+            print(f"📋 File list sent to {sender}: {len(files) if 'files' in locals() else 0} files")
+            
+        except Exception as e:
+            print(f"❌ Lỗi handle_file_list_request: {e}")
+            self.send_error("Error getting file list")
+    
+    def handle_file_share(self, sender, receiver, content, timestamp):
+        """Xử lý chia sẻ file với hỗ trợ text và binary"""
+        if not self.is_authenticated:
+            self.send_error("Not authenticated")
+            return
+        
+        try:
+            # Parse content: filename:type:file_content
+            parts = content.split(':', 2)
+            if len(parts) != 3:
+                self.send_error("Invalid file share format")
+                return
+            
+            filename, file_type, file_content = parts
+            
+            print(f"🔍 DEBUG: File share - Name: {filename}, Type: {file_type}, Content length: {len(file_content)}")
+            
+            # Lưu file vào thư mục files
+            import os
+            import base64
+            files_dir = os.path.join(os.path.dirname(__file__), '..', 'files')
+            os.makedirs(files_dir, exist_ok=True)
+            
+            file_path = os.path.join(files_dir, f"{self.username}_{filename}")
+            
+            if file_type == "text":
+                # Lưu file text
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(file_content)
+            elif file_type == "binary":
+                # Decode Base64 và lưu file binary
+                with open(file_path, 'wb') as f:
+                    f.write(base64.b64decode(file_content))
+            else:
+                self.send_error(f"Unsupported file type: {file_type}")
+                return
+            
+            print(f"✅ DEBUG: File saved to: {file_path}")
+            
+            # Thông báo thành công
+            success_msg = f"FILE_SHARE_OK|SERVER|{sender}|File {filename} uploaded successfully|{timestamp}"
+            self.send_message(success_msg)
+            
+            # Broadcast thông báo có file mới
+            if receiver == "ALL":
+                broadcast_msg = f"FILE_SHARED|{sender}|ALL|{sender} shared file: {filename}|{timestamp}"
+                self.server.broadcast_message(broadcast_msg, self)
+            else:
+                # Gửi private file notification
+                private_msg = f"FILE_SHARED|{sender}|{receiver}|{sender} sent you a file: {filename}|{timestamp}"
+                self.server.send_private_message(private_msg, receiver, self)
+            
+            print(f"📁 File shared: {filename} ({file_type}) by {sender}")
+            
+        except Exception as e:
+            print(f"❌ Lỗi handle_file_share: {e}")
+            import traceback
+            traceback.print_exc()
+            self.send_error("Error sharing file")
     
     def send_message(self, message):
         """Gửi tin nhắn đến client"""

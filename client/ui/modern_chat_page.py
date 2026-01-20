@@ -489,9 +489,29 @@ class ModernChatPage:
         )
         self.message_entry.pack(side='left', fill='x', expand=True, padx=(0, 15), ipady=12)
         
-        # Send button
+        # Buttons container để đảm bảo 2 nút có cùng kích thước
+        buttons_frame = tk.Frame(entry_container, bg=ModernColors.GRAY_50)
+        buttons_frame.pack(side='right')
+        
+        # File button - cùng kích thước với Send button
+        self.file_btn = tk.Button(
+            buttons_frame,
+            text="📎",
+            font=('Segoe UI', 14, 'bold'),
+            bg=ModernColors.SECONDARY,
+            fg=ModernColors.WHITE,
+            relief='flat',
+            bd=0,
+            cursor='hand2',
+            width=6,  # Cùng width
+            pady=12,  # Cùng pady
+            command=self.show_file_menu
+        )
+        self.file_btn.pack(side='left', padx=(0, 10))
+        
+        # Send button - cùng kích thước với File button
         self.send_btn = tk.Button(
-            entry_container,
+            buttons_frame,
             text="Send",
             font=('Segoe UI', 12, 'bold'),
             bg=ModernColors.PRIMARY,
@@ -499,15 +519,20 @@ class ModernChatPage:
             relief='flat',
             bd=0,
             cursor='hand2',
-            padx=25,
-            pady=12,
+            width=6,  # Cùng width
+            pady=12,  # Cùng pady
             command=self.send_message
         )
-        self.send_btn.pack(side='right')
+        self.send_btn.pack(side='left')
         
         # Add hover effect to send button
         ModernAnimations.button_hover_effect(
             self.send_btn, ModernColors.PRIMARY, ModernColors.PRIMARY_DARK
+        )
+        
+        # Add hover effect to file button
+        ModernAnimations.button_hover_effect(
+            self.file_btn, ModernColors.SECONDARY, ModernColors.SECONDARY_DARK
         )
         
         # Bind events
@@ -786,6 +811,59 @@ class ModernChatPage:
         except Exception as e:
             self.add_system_message(f"❌ Error sending message: {str(e)}")
     
+    def send_file_message(self, file_content):
+        """Send file upload message - separate method for large messages"""
+        if not self.connected:
+            return
+        
+        try:
+            # Xác định receiver
+            msg_type = self.msg_type_var.get()
+            if msg_type == "private":
+                if not self.selected_user:
+                    from tkinter import messagebox
+                    messagebox.showwarning("Warning", "Please select a user for private file sharing!")
+                    return
+                receiver = self.selected_user
+            else:
+                receiver = "ALL"
+            
+            # Tạo message
+            upload_msg = f"FILE_UPLOAD|{self.username}|{receiver}|{file_content}|{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            
+            print(f"🔍 DEBUG: Sending message length: {len(upload_msg)}")
+            
+            # Gửi message với encoding UTF-8
+            message_bytes = upload_msg.encode('utf-8')
+            print(f"🔍 DEBUG: Message bytes length: {len(message_bytes)}")
+            
+            # Gửi từng phần nếu message quá lớn
+            chunk_size = 64 * 1024  # 64KB chunks
+            if len(message_bytes) > chunk_size:
+                print(f"🔍 DEBUG: Message too large, sending in chunks")
+                # Gửi header trước
+                header = f"FILE_UPLOAD_START|{self.username}|{receiver}|{len(message_bytes)}|{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                self.socket.send(header.encode('utf-8'))
+                
+                # Gửi từng chunk
+                for i in range(0, len(message_bytes), chunk_size):
+                    chunk = message_bytes[i:i + chunk_size]
+                    self.socket.send(chunk)
+                    print(f"🔍 DEBUG: Sent chunk {i//chunk_size + 1}")
+                
+                # Gửi end marker
+                end_marker = f"FILE_UPLOAD_END|{self.username}|{receiver}|END|{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                self.socket.send(end_marker.encode('utf-8'))
+            else:
+                # Gửi trực tiếp nếu message nhỏ
+                self.socket.send(message_bytes)
+            
+            print(f"🔍 DEBUG: File message sent successfully")
+            
+        except Exception as e:
+            print(f"❌ DEBUG: Error sending file message: {e}")
+            self.add_system_message(f"❌ Error sending file: {str(e)}")
+    
     def on_search_users(self, event=None):
         """Handle user search"""
         search_term = self.search_entry.get().strip()
@@ -844,7 +922,8 @@ class ModernChatPage:
             
         while self.connected:
             try:
-                message = self.socket.recv(1024).decode('utf-8')
+                # Tăng buffer size để nhận file data
+                message = self.socket.recv(1024 * 1024).decode('utf-8')  # 1MB buffer
                 if not message:
                     break
                 
@@ -916,6 +995,20 @@ class ModernChatPage:
             if self.username not in self.online_users:
                 self.online_users.append(self.username)
                 self.update_online_users()
+        elif msg_type == "FILE_UPLOAD_OK":
+            self.add_system_message(f"✅ {content}")
+        elif msg_type == "FILE_SHARED":
+            self.add_system_message(f"📁 {content}")
+        elif msg_type == "FILE_LIST_OK":
+            # Hiển thị file browser
+            self.show_file_browser(content)
+        elif msg_type == "FILE_DOWNLOAD_OK":
+            # Xử lý file download
+            self.handle_file_download_response(content)
+        elif msg_type == "FILE_SHARE_OK":
+            self.add_system_message(f"✅ {content}")
+        else:
+            print(f"🔍 DEBUG: Unknown message type: {msg_type}")
     
     def update_online_users(self):
         """Update online users list"""
@@ -1042,3 +1135,345 @@ class ModernChatPage:
                 self.socket.send(ping_msg.encode('utf-8'))
             except:
                 pass
+    
+    def show_file_menu(self):
+        """Hiển thị menu file operations"""
+        from tkinter import messagebox
+        
+        # Tạo popup menu
+        file_menu = tk.Toplevel(self.root)
+        file_menu.title("File Operations")
+        file_menu.geometry("300x200")
+        file_menu.configure(bg=ModernColors.WHITE)
+        file_menu.resizable(False, False)
+        
+        # Center the popup
+        file_menu.transient(self.root)
+        file_menu.grab_set()
+        
+        # Center on parent window
+        x = self.root.winfo_x() + (self.root.winfo_width() // 2) - 150
+        y = self.root.winfo_y() + (self.root.winfo_height() // 2) - 100
+        file_menu.geometry(f"300x200+{x}+{y}")
+        
+        # Title
+        title_label = tk.Label(
+            file_menu,
+            text="📁 File Operations",
+            font=('Segoe UI', 16, 'bold'),
+            bg=ModernColors.WHITE,
+            fg=ModernColors.GRAY_900
+        )
+        title_label.pack(pady=20)
+        
+        # Upload button
+        upload_btn = tk.Button(
+            file_menu,
+            text="📤 Upload File",
+            font=('Segoe UI', 12, 'normal'),
+            bg=ModernColors.PRIMARY,
+            fg=ModernColors.WHITE,
+            relief='flat',
+            bd=0,
+            cursor='hand2',
+            padx=30,
+            pady=10,
+            command=lambda: [file_menu.destroy(), self.upload_file()]
+        )
+        upload_btn.pack(pady=5)
+        
+        # Download button
+        download_btn = tk.Button(
+            file_menu,
+            text="📥 Browse & Download Files",
+            font=('Segoe UI', 12, 'normal'),
+            bg=ModernColors.SECONDARY,
+            fg=ModernColors.WHITE,
+            relief='flat',
+            bd=0,
+            cursor='hand2',
+            padx=30,
+            pady=10,
+            command=lambda: [file_menu.destroy(), self.browse_files()]
+        )
+        download_btn.pack(pady=5)
+        
+        # Close button
+        close_btn = tk.Button(
+            file_menu,
+            text="❌ Close",
+            font=('Segoe UI', 12, 'normal'),
+            bg=ModernColors.GRAY_400,
+            fg=ModernColors.WHITE,
+            relief='flat',
+            bd=0,
+            cursor='hand2',
+            padx=30,
+            pady=10,
+            command=file_menu.destroy
+        )
+        close_btn.pack(pady=5)
+    
+    def upload_file(self):
+        """Upload file to server - Improved version"""
+        from tkinter import filedialog, messagebox
+        import os
+        import base64
+        
+        # Chọn file
+        file_path = filedialog.askopenfilename(
+            title="Select file to upload",
+            filetypes=[
+                ("Text files", "*.txt *.md *.py *.js *.html *.css"),
+                ("Images", "*.png *.jpg *.jpeg *.gif *.bmp"),
+                ("Documents", "*.pdf *.doc *.docx"),
+                ("All files", "*.*")
+            ]
+        )
+        
+        if not file_path:
+            return
+        
+        try:
+            # Kiểm tra kích thước file (giới hạn 5MB)
+            file_size = os.path.getsize(file_path)
+            if file_size > 5 * 1024 * 1024:  # 5MB
+                messagebox.showerror("Error", "File size must be less than 5MB!")
+                return
+            
+            filename = os.path.basename(file_path)
+            
+            # Thử đọc file dưới dạng text trước
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    file_content = f.read()
+                file_type = "text"
+                print(f"🔍 DEBUG: Text file - Size: {file_size}, Content length: {len(file_content)}")
+            except UnicodeDecodeError:
+                # Nếu không phải text, dùng Base64
+                with open(file_path, 'rb') as f:
+                    file_content = base64.b64encode(f.read()).decode('utf-8')
+                file_type = "binary"
+                print(f"🔍 DEBUG: Binary file - Size: {file_size}, Base64 length: {len(file_content)}")
+            
+            # Xác định receiver
+            msg_type = self.msg_type_var.get()
+            if msg_type == "private":
+                if not self.selected_user:
+                    messagebox.showwarning("Warning", "Please select a user for private file sharing!")
+                    return
+                receiver = self.selected_user
+            else:
+                receiver = "ALL"
+            
+            # Gửi file với type information
+            # Format: FILE_SHARE|sender|receiver|filename:type:content|timestamp
+            file_message = f"FILE_SHARE|{self.username}|{receiver}|{filename}:{file_type}:{file_content}|{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            
+            print(f"🔍 DEBUG: Message length: {len(file_message)}")
+            
+            self.socket.send(file_message.encode('utf-8'))
+            
+            # Hiển thị thông báo
+            self.add_system_message(f"📤 Uploading {filename}...")
+            
+        except Exception as e:
+            print(f"❌ DEBUG: Upload error: {e}")
+            messagebox.showerror("Error", f"Failed to upload file: {str(e)}")
+    
+    def browse_files(self):
+        """Browse và download files từ server"""
+        try:
+            # Request danh sách file từ server
+            list_msg = f"FILE_LIST|{self.username}|SERVER|request|{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            self.socket.send(list_msg.encode('utf-8'))
+            
+            # Hiển thị loading message
+            self.add_system_message("📋 Loading file list...")
+            
+        except Exception as e:
+            from tkinter import messagebox
+            messagebox.showerror("Error", f"Failed to get file list: {str(e)}")
+    
+    def show_file_browser(self, files_data):
+        """Hiển thị file browser window"""
+        from tkinter import messagebox
+        
+        if not files_data:
+            messagebox.showinfo("Info", "No files available for download.")
+            return
+        
+        # Tạo file browser window
+        browser = tk.Toplevel(self.root)
+        browser.title("📁 Available Files")
+        browser.geometry("500x400")
+        browser.configure(bg=ModernColors.WHITE)
+        
+        # Center the window
+        browser.transient(self.root)
+        browser.grab_set()
+        
+        x = self.root.winfo_x() + (self.root.winfo_width() // 2) - 250
+        y = self.root.winfo_y() + (self.root.winfo_height() // 2) - 200
+        browser.geometry(f"500x400+{x}+{y}")
+        
+        # Title
+        title_label = tk.Label(
+            browser,
+            text="📁 Available Files",
+            font=('Segoe UI', 16, 'bold'),
+            bg=ModernColors.WHITE,
+            fg=ModernColors.GRAY_900
+        )
+        title_label.pack(pady=10)
+        
+        # Files list frame
+        list_frame = tk.Frame(browser, bg=ModernColors.WHITE)
+        list_frame.pack(fill='both', expand=True, padx=20, pady=10)
+        
+        # Scrollable list
+        from tkinter import ttk
+        
+        # Treeview for files
+        columns = ('filename', 'size', 'uploader')
+        tree = ttk.Treeview(list_frame, columns=columns, show='headings', height=12)
+        
+        # Define headings
+        tree.heading('filename', text='Filename')
+        tree.heading('size', text='Size')
+        tree.heading('uploader', text='Uploaded by')
+        
+        # Configure column widths
+        tree.column('filename', width=200)
+        tree.column('size', width=80)
+        tree.column('uploader', width=100)
+        
+        # Add scrollbar
+        scrollbar = ttk.Scrollbar(list_frame, orient='vertical', command=tree.yview)
+        tree.configure(yscrollcommand=scrollbar.set)
+        
+        # Pack treeview and scrollbar
+        tree.pack(side='left', fill='both', expand=True)
+        scrollbar.pack(side='right', fill='y')
+        
+        # Parse và add files
+        files = files_data.split(',') if files_data else []
+        for file_info in files:
+            if ':' in file_info:
+                parts = file_info.split(':', 2)
+                if len(parts) == 3:
+                    filename, size, uploader = parts
+                    # Format file size
+                    size_int = int(size)
+                    if size_int < 1024:
+                        size_str = f"{size_int} B"
+                    elif size_int < 1024 * 1024:
+                        size_str = f"{size_int / 1024:.1f} KB"
+                    else:
+                        size_str = f"{size_int / (1024 * 1024):.1f} MB"
+                    
+                    tree.insert('', 'end', values=(filename, size_str, uploader))
+        
+        # Buttons frame
+        btn_frame = tk.Frame(browser, bg=ModernColors.WHITE)
+        btn_frame.pack(fill='x', padx=20, pady=10)
+        
+        # Download button
+        def download_selected():
+            selection = tree.selection()
+            if not selection:
+                messagebox.showwarning("Warning", "Please select a file to download!")
+                return
+            
+            item = tree.item(selection[0])
+            filename = item['values'][0]
+            uploader = item['values'][2]
+            
+            # Tạo full filename với uploader prefix
+            full_filename = f"{uploader}_{filename}"
+            
+            browser.destroy()
+            self.download_file(full_filename, filename)  # Pass both full and display names
+        
+        download_btn = tk.Button(
+            btn_frame,
+            text="📥 Download Selected",
+            font=('Segoe UI', 12, 'bold'),
+            bg=ModernColors.SUCCESS,
+            fg=ModernColors.WHITE,
+            relief='flat',
+            bd=0,
+            cursor='hand2',
+            padx=20,
+            pady=10,
+            command=download_selected
+        )
+        download_btn.pack(side='left', padx=(0, 10))
+        
+        # Close button
+        close_btn = tk.Button(
+            btn_frame,
+            text="❌ Close",
+            font=('Segoe UI', 12, 'normal'),
+            bg=ModernColors.GRAY_400,
+            fg=ModernColors.WHITE,
+            relief='flat',
+            bd=0,
+            cursor='hand2',
+            padx=20,
+            pady=10,
+            command=browser.destroy
+        )
+        close_btn.pack(side='right')
+    
+    def download_file(self, full_filename, display_name=None):
+        """Download file từ server"""
+        try:
+            # Gửi yêu cầu download với full filename
+            download_msg = f"FILE_DOWNLOAD|{self.username}|SERVER|{full_filename}|{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            self.socket.send(download_msg.encode('utf-8'))
+            
+            # Hiển thị loading message với display name
+            display_name = display_name or full_filename
+            self.add_system_message(f"📥 Downloading {display_name}...")
+            
+        except Exception as e:
+            from tkinter import messagebox
+            messagebox.showerror("Error", f"Failed to download file: {str(e)}")
+    
+    def handle_file_download_response(self, content):
+        """Xử lý response download file từ server"""
+        from tkinter import filedialog, messagebox
+        import base64
+        import os
+        
+        try:
+            # Parse response: filename#filesize#base64_data (sử dụng # thay vì |)
+            parts = content.split('#', 2)
+            if len(parts) != 3:
+                messagebox.showerror("Error", "Invalid file download response")
+                return
+            
+            filename, filesize, file_data = parts
+            
+            # Chọn nơi lưu file
+            save_path = filedialog.asksaveasfilename(
+                title="Save file as",
+                initialname=filename,
+                defaultextension="",
+                filetypes=[("All files", "*.*")]
+            )
+            
+            if not save_path:
+                return
+            
+            # Decode và lưu file
+            with open(save_path, 'wb') as f:
+                f.write(base64.b64decode(file_data))
+            
+            self.add_system_message(f"✅ File downloaded successfully: {os.path.basename(save_path)}")
+            messagebox.showinfo("Success", f"File downloaded successfully!\nSaved to: {save_path}")
+            
+        except Exception as e:
+            print(f"❌ DEBUG: Download error: {e}")
+            messagebox.showerror("Error", f"Failed to save file: {str(e)}")
